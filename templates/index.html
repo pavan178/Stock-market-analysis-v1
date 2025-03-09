@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stock Analysis Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    /* Custom Styles */
+    .dashboard-header { background: #1a3a8f; color: white; padding: 1rem; }
+    .search-container { position: relative; margin: 1rem 0; }
+    #searchResults { 
+      position: absolute; 
+      z-index: 1000; 
+      background: white; 
+      width: 100%; 
+      max-height: 60vh; 
+      overflow-y: auto; 
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
+    }
+    .search-item { 
+      padding: 12px; 
+      border-bottom: 1px solid #eee; 
+      cursor: pointer; 
+      display: flex; 
+      align-items: center; 
+    }
+    .watchlist-item { 
+      display: flex; 
+      align-items: center; 
+      padding: 8px; 
+      margin: 4px 0; 
+      background: #f8f9fa; 
+      border-radius: 4px; 
+    }
+    .analysis-row { 
+      display: flex; 
+      justify-content: space-between; 
+      padding: 0.5rem 0; 
+      border-bottom: 1px solid #eee; 
+    }
+    .positive { color: #28a745; }
+    .negative { color: #dc3545; }
+    .loading-indicator { display: none; }
+    .sector {
+      font-size: 0.9em;
+      color: #666;
+      margin-left: 1rem;
+      flex-shrink: 0;
+      width: 200px;
+      text-overflow: ellipsis;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+    .symbol { width: 80px; font-weight: bold; }
+    .name { flex: 2; margin: 0 15px; }
+    .price { width: 100px; text-align: right; }
+    .analysis-container {
+        background: white;
+        padding: 2rem;
+        border-radius: 10px;
+        box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+    }
+
+    .analysis-header {
+        border-bottom: 2px solid #eee;
+        padding-bottom: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .price-section {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .current-price {
+        font-size: 2.5rem;
+        color: #2c3e50;
+    }
+
+    .recommendation {
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-weight: bold;
+    }
+    .recommendation.strong-buy { background: #28a745; color: white; }
+    .recommendation.buy { background: #90EE90; color: #2c3e50; }
+    .recommendation.hold { background: #ffc107; color: white; }
+    .recommendation.sell { background: #dc3545; color: white; }
+
+    .score-section {
+        background: #f8f9fa;
+        height: 40px;
+        border-radius: 20px;
+        position: relative;
+        margin: 1.5rem 0;
+    }
+    .score-progress {
+        height: 100%;
+        background: linear-gradient(90deg, #dc3545, #ffc107, #28a745);
+        border-radius: 20px;
+        transition: width 0.5s ease;
+    }
+    .score-text {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-weight: bold;
+        color: #2c3e50;
+    }
+
+    .metric-card {
+        background: #f8f9fa;
+        padding: 1rem;
+        border-radius: 8px;
+        height: 100%;
+    }
+    .metric-value {
+        font-size: 1.8rem;
+        margin: 0.5rem 0;
+    }
+    .positive { color: #28a745; }
+    .negative { color: #dc3545; }
+
+    .headline-list {
+        padding-left: 1rem;
+        margin-bottom: 0;
+    }
+    .headline-list li {
+        margin: 0.5rem 0;
+        font-size: 0.9rem;
+    }
+
+    .technical-section {
+        margin-top: 2rem;
+        padding: 1.5rem;
+        background: #f8f9fa;
+        border-radius: 8px;
+    }
+
+    /* Help notes */
+    .help-note {
+        text-align: right;
+        color: #666;
+        font-size: 0.9rem;
+        margin-bottom: 1rem;
+    }
+    .help-note i { margin-right: 5px; }
+
+    /* Tooltip styling */
+    .tooltip-inner {
+        max-width: 300px;
+        padding: 0.5rem 1rem;
+        background: #2c3e50;
+        border-radius: 4px;
+    }
+
+    /* Legend */
+    .legend-section {
+        margin-top: 2rem;
+        padding: 1rem;
+        background: #f8f9fa;
+        border-radius: 8px;
+        display: flex;
+        gap: 1.5rem;
+    }
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+    .dot.good { background: #28a745; }
+    .dot.bad { background: #dc3545; }
+    .dot.neutral { background: #ffc107; }
+
+    /* Info icons */
+    .bi-question-circle {
+        color: #666;
+        font-size: 0.8em;
+        cursor: help;
+    }
+
+    .prediction-section {
+        margin-top: 2rem;
+        padding: 1.5rem;
+        background: #f8f9fa;
+        border-radius: 8px;
+    }
+
+    .prediction-card {
+        padding: 1rem;
+        border-radius: 8px;
+    }
+
+    .prediction-card.buy {
+        background: #e8f5e9;
+        border: 2px solid #4caf50;
+    }
+
+    .prediction-card.sell {
+        background: #ffebee;
+        border: 2px solid #f44336;
+    }
+
+    .prediction-chart {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 1rem;
+    }
+
+    .prediction-day {
+        text-align: center;
+        padding: 0.5rem;
+        background: white;
+        border-radius: 4px;
+        flex: 1;
+        margin: 0 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard-header">
+    <div class="container">
+      <h1>Stock Analysis Dashboard</h1>
+    </div>
+  </div>
+
+  <div class="container mt-4">
+    <!-- Search Section -->
+    <div class="search-container">
+      <form id="screener-form">
+        <div class="input-group">
+          <input type="text" 
+                 id="searchInput" 
+                 name="ticker"
+                 class="form-control" 
+                 placeholder="Search stocks..."
+                 autocomplete="off">
+          <button class="btn btn-primary" type="submit">Analyze</button>
+          <button class="btn btn-success" type="button" id="addToWatchlist">
+            Add to Watchlist
+          </button>
+        </div>
+      </form>
+      <div id="searchResults"></div>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loadingIndicator" class="loading-indicator text-center my-4">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+    </div>
+
+    <!-- Results Section -->
+    <div id="result" class="mt-4"></div>
+
+    <!-- Watchlist Section -->
+    <div class="mt-4">
+      <h4>My Watchlist</h4>
+      <div id="watchlist"></div>
+    </div>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script>
+  $(document).ready(function() {
+    let allStocks = [];
+    
+    // Load only symbol/name/sector data
+    $.get('/tickers', function(data) {
+        allStocks = data;
+    });
+
+    // Search functionality - no price loading
+    $('#searchInput').on('input', function() {
+        const query = $(this).val().toUpperCase();
+        const results = allStocks.filter(stock => 
+            stock.symbol.startsWith(query) || 
+            stock.name.toUpperCase().includes(query)
+        ).slice(0, 50);
+        
+        $('#searchResults').html(
+            results.map(stock => `
+                <div class="search-item" data-symbol="${stock.symbol}">
+                    <span class="symbol">${stock.symbol}</span>
+                    <span class="name">${stock.name}</span>
+                    <span class="sector">${stock.sector}</span>
+                    <span class="price">[Select to load price]</span>
+                </div>
+            `).join('')
+        );
+    });
+
+    // Stock selection
+    $(document).on('click', '.search-item', function() {
+      const symbol = $(this).data('symbol');
+      $('#searchInput').val(symbol);
+      $('#searchResults').empty();
+      $('#screener-form').trigger('submit');
+    });
+
+    // Analysis form submission
+    $('#screener-form').on('submit', function(e) {
+      e.preventDefault();
+      const ticker = $('#searchInput').val().trim().toUpperCase();
+      
+      if (!ticker) {
+        alert('Please enter a stock symbol');
+        return;
+      }
+
+      // Check against known valid tickers
+      const isValid = allStocks.some(stock => stock.symbol === ticker);
+      if (!isValid) {
+        if (!confirm(`"${ticker}" not found in our database. Try anyway?`)) {
+          return;
+        }
+      }
+
+      $('#loadingIndicator').show();
+      
+      $.ajax({
+        type: 'POST',
+        url: '/analyze',
+        data: { ticker: ticker },
+        success: function(data) {
+          $('#loadingIndicator').hide();
+          displayAnalysisResults(data);
+        },
+        error: function(err) {
+          $('#loadingIndicator').hide();
+          const errorMsg = err.responseJSON?.error || 'Unknown error occurred';
+          alert(`Error: ${errorMsg}`);
+        }
+      });
+    });
+
+    // Fix watchlist functionality
+    function addToWatchlist(symbol) {
+        if (!symbol) return;
+        
+        $.ajax({
+            url: '/watchlist',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ action: 'add', symbol: symbol }),
+            success: function() {
+                refreshWatchlist();
+                alert(`${symbol} added to watchlist!`);
+            },
+            error: function(err) {
+                alert(`Error: ${err.responseJSON?.error || 'Failed to add to watchlist'}`);
+            }
+        });
+    }
+
+    // Update click handler
+    $('#addToWatchlist').click(function() {
+        const symbol = $('#searchInput').val().trim().toUpperCase();
+        if (symbol) {
+            addToWatchlist(symbol);
+        } else {
+            alert('Please select a stock first');
+        }
+    });
+
+    // Update watchlist display
+    function refreshWatchlist() {
+        $.get('/watchlist', function(watchlist) {
+            $('#watchlist').empty();
+            watchlist.forEach(symbol => {
+                $.get(`/realtime/${symbol}`, function(data) {
+                    $('#watchlist').append(`
+                        <div class="watchlist-item" data-symbol="${symbol}">
+                            <span class="symbol">${symbol}</span>
+                            <span class="price">$${data.price.toFixed(2)}</span>
+                            <span class="change ${data.change >= 0 ? 'positive' : 'negative'}">
+                                ${data.change.toFixed(2)}%
+                            </span>
+                            <button class="btn btn-sm btn-danger remove-btn">X</button>
+                        </div>
+                    `);
+                }).fail(() => {
+                    $('#watchlist').append(`
+                        <div class="watchlist-item error" data-symbol="${symbol}">
+                            <span class="symbol">${symbol}</span>
+                            <span class="error-msg">Failed to load data</span>
+                            <button class="btn btn-sm btn-danger remove-btn">X</button>
+                        </div>
+                    `);
+                });
+            });
+        });
+    }
+
+    $(document).on('click', '.remove-btn', function() {
+      const symbol = $(this).closest('.watchlist-item').data('symbol');
+      $.ajax({
+        url: '/watchlist',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ action: 'remove', symbol: symbol }),
+        success: refreshWatchlist
+      });
+    });
+
+    // Initial watchlist load
+    refreshWatchlist();
+    setInterval(refreshWatchlist, 30000);
+
+    // Display results function
+    function displayAnalysisResults(data) {
+      const fmt = num => typeof num === 'number' ? num.toFixed(2) : 'N/A';
+      const safeExplain = data.explanation.replace(/\n/g, '<br>');
+      
+      // Sentiment indicators
+      const sentimentColor = data.sentiment_score > 0 ? 'positive' : 'negative';
+      const sentimentLabel = data.sentiment_score > 0 ? 'Bullish' : 'Bearish';
+      
+      // Composite score visualization
+      const scoreWidth = Math.min(Math.max(data.composite_score * 100, 0), 100);
+      
+      $('#result').html(`
+        <div class="analysis-container">
+            <!-- Header Section -->
+            <div class="analysis-header">
+                <h2>${data.ticker} - ${data.sector}</h2>
+                <div class="price-section">
+                    <span class="current-price">$${fmt(data.latest_price)}</span>
+                    <span class="recommendation ${data.recommendation.toLowerCase()}">
+                        ${data.recommendation}
+                    </span>
+                </div>
+            </div>
+
+            <!-- Score Breakdown -->
+            <div class="score-section">
+                <div class="score-progress" style="width: ${scoreWidth}%"></div>
+                <span class="score-text">Composite Score: ${fmt(data.composite_score)}</span>
+            </div>
+
+            <!-- Valuation & Sentiment -->
+            <div class="row metrics-row">
+                <div class="col-md-4">
+                    <div class="metric-card">
+                        <h5>Fair Value Estimate</h5>
+                        <div class="metric-value">
+                            $${fmt(data.fair_price)} 
+                            <span class="vs-price ${data.latest_price > data.fair_price ? 'negative' : 'positive'}">
+                                (${((data.latest_price - data.fair_price)/data.fair_price * 100).toFixed(1)}%)
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                
+                
+                <div class="col-md-4">
+                    <div class="metric-card">
+                        <h5>Market Sentiment</h5>
+                        <div class="metric-value ${sentimentColor}">
+                            ${sentimentLabel} (${fmt(data.sentiment_score)})
+                        </div>
+                        <div class="headline-count">
+                            Analyzed ${data.sentiment_details.headline_count} headlines
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-4">
+                    <div class="metric-card">
+                        <h5>Recent News Headlines</h5>
+                        <ul class="headline-list">
+                            ${data.sentiment_details.sample_headlines.map(h => 
+                                `<li>${h}</li>`
+                            ).join('')}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Technical Analysis Breakdown -->
+            <div class="technical-section">
+                ${safeExplain}
+            </div>
+
+            <!-- AI Predictions -->
+            <div class="prediction-section">
+                <h4>AI Predictions</h4>
+                <div class="prediction-card ${data.prediction.recommendation.toLowerCase()}">
+                    <div class="prediction-header">
+                        Recommendation: ${data.prediction.recommendation} 
+                        (Confidence: ${(data.prediction.confidence * 100).toFixed(1)}%)
+                    </div>
+                    <div class="prediction-chart">
+                        ${data.prediction.dates.map((date, i) => `
+                            <div class="prediction-day">
+                                <div class="date">${date}</div>
+                                <div class="price">$${data.prediction.prices[i].toFixed(2)}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `);
+    }
+  });
+  </script>
+</body>
+</html>
